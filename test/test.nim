@@ -120,6 +120,9 @@ let known_layers = [
 # loop thru csv files
 for csvFile in walkFiles("../post/*.csv"):
 
+  # if not csvFile.startsWith("../post/tyler"):
+  #   continue
+
   var
     #csvFile = extractFilename(t)
     rows = readAll(csvFile, "mytmp")
@@ -195,6 +198,12 @@ for csvFile in walkFiles("../post/*.csv"):
   doAssert(rehab[0] == "rehab")
   echo "+ passed: test headers"
 
+  # test for blank completion date
+  for i,d in compdate:
+    # echo csvFile, " line: ", i+1 
+    doAssert(d.len>0)
+  echo "+passed: no blank completion dates" 
+
   # test for blanks in brm/erm
   doAssert(not ("" in brm.unique()))
   doAssert(not ("" in erm.unique()))
@@ -205,7 +214,7 @@ for csvFile in walkFiles("../post/*.csv"):
      if i > 0:
        # echo "line: ", i, " field: ", b
        doAssert(b.startsWith("M") or b.startsWith("F"))
-  echo "+ passed: lanes begins with M or F or l"
+  echo "+ passed: lanes begins with M or F"
 
   # test len csj == 9
   for c in csj[1..^1].unique():
