@@ -212,7 +212,7 @@ let known_units = [
 
 # loop thru csv files
 # for csvFile in walkFiles("../post/baks/*.csv"):
-for csvFile in walkFiles("../post/baks/done/*.csv"):
+for csvFile in walkFiles("../post/*.csv"):
 
   var
     rows = readAll(csvFile, "mytmp")
@@ -317,6 +317,10 @@ for csvFile in walkFiles("../post/baks/done/*.csv"):
       doAssert(bdp[i][0] != '-')
       if debug: echo "test for negative edp"
       doAssert(edp[i][0] != '-')
+      if debug: echo "test for numeric bdp"
+      doAssert(parseFloat(bdp[i]) >= 0)
+      if debug: echo "test for numeric edp"
+      doAssert(parseFloat(edp[i]) >= 0)
       if debug: echo "test for brm markers"
       doAssert(hwy[i] & fixtrm(brm[i]) in shwy)
       if debug: echo "test for erm markers"
