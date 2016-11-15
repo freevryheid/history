@@ -1,30 +1,32 @@
 import
-  os, strutils, csv, db_postgres, sequtils
+  os, strutils, csv, db_postgres, sequtils, math
 
-proc unique(ss: seq[string]): seq[string] =
-  result = @[]
-  for s in ss:
-    if not (s in result):
-      result.add(s)
+# proc unique(ss: seq[string]): seq[string] =
+#   result = @[]
+#   for s in ss:
+#     if not (s in result):
+#       result.add(s)
 
 proc fixtrm(i: string): string =
+  result = i
   var j = i.strip()
   if j.len() < 4:
     result = j.align(4, padding = '0')
-  else:
-    result = j.align(5, padding = '0')
 
 let
-  #csvFile = paramStr(1)
+  debugs = paramStr(1)
   db_pmis = open("localhost", "grassy", "", "pmis")
 
 var
-  hwys = db_pmis.getAllRows(sql"select concat(trim(substr(hwy,1,7)),trm) as hwytrm from hwys_trm;")
+  hwys = db_pmis.getAllRows(sql"select concat(trim(substr(route_name,1,7)),trm) as hwytrm from pa_trm;")
+  debug: bool = false
+
+if debugs == "1":
+  debug = true
 
 # close database
 db_pmis.close()
 
-# layer in LAYER
 let known_layers = [
   "Dense-graded TY-C",
   "Dense-graded TY-D",
@@ -117,19 +119,105 @@ let known_layers = [
   "Stone matrix asphalt SMA",
 ]
 
-# loop thru csv files
-for csvFile in walkFiles("../post/*.csv"):
+let known_units = [
+  "",
+  "C",
+  "ACR",
+  "BAG",
+  "BLL",
+  "BDF",
+  "BK",
+  "BOX",
+  "BKT",
+  "BND",
+  "CS",
+  "CYM",
+  "CAN",
+  "CLMI",
+  "COI",
+  "CNT",
+  "CUF",
+  "CY",
+  "D",
+  "DMI",
+  "DRU",
+  "DAY",
+  "DOZ",
+  "EA",
+  "F",
+  "FT",
+  "GLA",
+  "GAL",
+  "IN",
+  "JAR",
+  "JNT",
+  "KG",
+  "KM",
+  "KIT",
+  "LNM",
+  "LS",
+  "LF",
+  "LTR",
+  "LOT",
+  "MGR",
+  "M",
+  "MIL",
+  "ML",
+  "MM",
+  "NOS",
+  "NONE",
+  "OZ",
+  "PAK",
+  "PKG",
+  "PAD",
+  "PR",
+  "PL",
+  "MYR",
+  "PC",
+  "PT",
+  "PTA",
+  "LB",
+  "LBA",
+  "QTA",
+  "QT",
+  "REA",
+  "ROL",
+  "RO",
+  "SVC",
+  "SET",
+  "SHT",
+  "SQF",
+  "SM",
+  "STA",
+  "SY",
+  "TUB",
+  "TON",
+  "UNI",
+  "MON",
+  "MWK",
+  "HOU",
+  "YD",
+  "PAI",
+  "BOT",
+  "DOL",
+  "LFT",
+  "CUY1",
+  "CRG",
+  "CYL",
+  "CTN",
+  "SQYD1",
+  "JUG",
+  "CM"
+]
 
-  # if not csvFile.startsWith("../post/tyler"):
-  #   continue
+# loop thru csv files
+# for csvFile in walkFiles("../post/baks/*.csv"):
+for csvFile in walkFiles("../post/baks/done/*.csv"):
 
   var
-    #csvFile = extractFilename(t)
     rows = readAll(csvFile, "mytmp")
     dtin,src,district,county,hwy,brm,bdp,erm,edp,lane,csj,pjdesc,workid,wrk,funcode,descr,layer,itm,lin,layerno,mthk,activity,letdate,compdate,qty,unt,cost,spec_yr,rehab: seq[string] = @[]
     shwy: seq[string] = @[]
-
-  echo "processing " & csvFile
 
   for h in hwys:
     shwy.add(h[0])
@@ -165,7 +253,6 @@ for csvFile in walkFiles("../post/*.csv"):
     spec_yr.add(ls[27])
     rehab.add(ls[28])
 
-  # tests
   # test headers
   doAssert(dtin[0] == "dtin")
   doAssert(src[0] == "src")
@@ -196,59 +283,43 @@ for csvFile in walkFiles("../post/*.csv"):
   doAssert(cost[0] == "cost")
   doAssert(spec_yr[0] == "spec_yr")
   doAssert(rehab[0] == "rehab")
-  echo "+ passed: test headers"
+  # echo "+ passed: test headers"
 
-  # test for blank completion date
-  for i,d in compdate:
-    # echo csvFile, " line: ", i+1 
-    doAssert(d.len>0)
-  echo "+passed: no blank completion dates" 
-
-  # test for blanks in brm/erm
-  doAssert(not ("" in brm.unique()))
-  doAssert(not ("" in erm.unique()))
-  echo "+ passed: no blanks in brm/erm"
-
-  # test lane begins with M or F or l
-  for i, b in lane:
-     if i > 0:
-       # echo "line: ", i, " field: ", b
-       doAssert(b.startsWith("M") or b.startsWith("F"))
-  echo "+ passed: lanes begins with M or F"
-
-  # test len csj == 9
-  for c in csj[1..^1].unique():
-    doAssert(c.len() == 9)
-  echo "+ passed: csj len"
-
-
-  # test layer in known_layers
-  for lay in layer[1..^1].unique():
-    # echo lay
-    doAssert(lay in known_layers)
-  echo "+ passed: no unknown layers"
-
-  # check trm info
-  # need lane and trm limits
-
-  # check brm markers
-  for i, b in brm:
+  # main loop
+  for i in 0..<len(dtin):
+    if debug: echo csvFile, " line: ", i+1
     if i > 0:
-      #echo $(i+1), " BRM >> ", hwy[i] & fixtrm(b)
-      doAssert(hwy[i] & fixtrm(b) in shwy)
-  echo "+ passed: good brms"
-
-    # check erm markers
-  for i, b in erm:
-    if i > 0:
-      #echo $(i+1), " ERM >> ", hwy[i] & fixtrm(b)
-      doAssert(hwy[i] & fixtrm(b) in shwy)
-  echo "+ passed: good erms"
-
-# To track done trm errors use the following sql (examples): 
-# select * from dcis where control_sect_job ~ '156701024';
-# select * from m where hwy ~ 'FM0720' and c_sec ~ '1567-01' order by data_date, frm_dfo;
-# select * from m where hwy ~ 'SH0020' and c_sec ~ '0002-02' order by data_date, frm_dfo;
-# select * from hwys_trm where hwy ~ 'SH0020' order by trm;
-
-
+      if debug: echo "test for blank completion date"
+      doAssert(compdate[i].len>0)
+      if debug: echo "test for blank in brm"
+      doAssert(brm[i] != "")
+      if debug: echo "test for blank in erm"
+      doAssert(erm[i] != "")
+      if debug: echo "test for blank in bdp"
+      doAssert(bdp[i] != "")
+      if debug: echo "test for blank in edp"
+      doAssert(edp[i] != "")
+      if debug: echo "test that lane begins with M or F"
+      doAssert(lane[i].startsWith('M') or lane[i].startsWith('F'))
+      if debug: echo "test len csj == 9"
+      doAssert(csj[i].len() == 9)
+      if debug: echo "test layer in known_layers"
+      doAssert(layer[i] in known_layers)
+      if debug: echo "test for brm starting with 0"
+      if len(brm[i]) > 1:
+        doAssert(brm[i][0] != '0')
+      if debug: echo "test for erm starting with 0"
+      if len(erm[i]) > 1:
+        doAssert(erm[i][0] != '0')
+      if debug: echo "test for reversed brm/erm"
+      doAssert(parseInt(brm[i][0..2]) <= parseInt(erm[i][0..2]))
+      if debug: echo "test for negative bdp"
+      doAssert(bdp[i][0] != '-')
+      if debug: echo "test for negative edp"
+      doAssert(edp[i][0] != '-')
+      if debug: echo "test for brm markers"
+      doAssert(hwy[i] & fixtrm(brm[i]) in shwy)
+      if debug: echo "test for erm markers"
+      doAssert(hwy[i] & fixtrm(erm[i]) in shwy)
+      if debug: echo "test unit in known_units"
+      doAssert(unt[i] in known_units)
